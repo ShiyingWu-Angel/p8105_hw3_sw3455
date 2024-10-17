@@ -4,7 +4,6 @@ author: "Shiying Wu"
 date: "2024-10-13"
 output: github_document
 ---
-### Problem 1
 
 ```{r setup, include=FALSE}
 library(tidyverse)
@@ -29,62 +28,75 @@ options(
 
 scale_colour_discrete = scale_colour_viridis_d
 scale_fill_discrete = scale_fill_viridis_d
+
 ```
 
-
-
-This dataset contains `r nrow(ny_noaa)` rows and `r ncol(ny_noaa)` columns. Variables include weather station id, date of observation,  (tenths of mm), snowfall (mm), snow depth (mm), and min and max temperature (tenths of degrees C).
-
-Below we clean the data, creating separate variables for year, month, and day and converting `tmax` and `tmin` to numeric. We find that 0 is the most commonly observed value for snowfall. This is because most days of the year, it does not snow at all in NY. The second most commonly observed value is `NA`, indicating missingness. Other common values are 13, 25, and 51, suggesting that snowfall is originally recorded in fractions of an inch and converted to mm.
-
+### Problem 1
 ```{r clean_data}
-
 data("ny_noaa")
+ny_noaa <- ny_noaa |> 
+  janitor::clean_names() |>
+  separate(date, into = c("year", "month", "day"), convert = TRUE) |> 
+  mutate(tmax = as.numeric(tmax) / 10,  
+         tmin = as.numeric(tmin) / 10,
+         prcp = prcp / 10, 
+         snow = snow / 10 
+        )
 
-ny_noaa |> 
+ny_noaa |>
+  filter(!is.na(snow)) |>
   count(snow) |>
   arrange(desc(n))
 
-ny_noaa = 
-  ny_noaa |> 
-  separate(date, into = c("year", "month", "day"), convert = TRUE) |> 
-  mutate(
-    tmax = as.numeric(tmax),
-    tmin = as.numeric(tmin))
 ```
 
-Below is a two-panel plot showing the average max temperature in January and in July in each station across years. As expected, the mean temperature in January is much lower than the mean temperature in July for all stations and across all years. All stations appear to follow similar trends of temperature peaks and valleys within a month across the years, i.e. when one station has a high monthly mean temperature for a given year, most other stations also have a high monthly mean temperature for that year. We do see one uncharacteristically cold station in July of 1987 or 1988, as well as a few other less drastic outliers.
+
+This dataset contains `r nrow(ny_noaa)` rows and `r ncol(ny_noaa)` columns. 
+
+id: Weather station identifier.
+date: Date of the observation.
+prcp: Precipitation (tenths of mm).
+snow: Snowfall (mm).
+snwd: Snow depth (mm).
+tmax: Maximum daily temperature (tenths of degrees C).
+tmin: Minimum daily temperature (tenths of degrees C).
+
+I clean the dataset by creating separate variables for year, month, and day from the date column. I also convert tmax, tmin, precipitation, and snowfall to appropriate units (Celsius for temperatures and centimeters for snowfall). Upon examining snowfall, I find that 0 is the most commonly observed value, which makes sense as snowfall does not occur on most days in New York. The second most common value is NA, indicating missing data. Other frequently observed values include 13, 25, and 51, which suggest that snowfall was originally recorded in inches and later converted to millimeters.
 
 ```{r}
 ny_noaa |> 
-  group_by(id, year, month) |> 
   filter(month %in% c(1, 7)) |> 
-  summarize(mean_tmax = mean(tmax, na.rm = TRUE, color = id)) |> 
-  ggplot(aes(x = year, y = mean_tmax, group = id)) + geom_point() + geom_path() +
+  group_by(id, year, month) |> 
+  summarize(avg_tmax = mean(tmax, na.rm = TRUE)) |> 
+  ggplot(aes(x = year, y = avg_tmax, group = id, color = factor(month))) + geom_point() + geom_path() +
   facet_grid(~month) +
   labs(title = "Mean monthly temperature for each station across years for January and July")
 ```
-
-Below we show a two-panel plot including (i) a hex plot of `tmax` vs `tmin` for the full dataset; and (ii) a ridge plot showing the distribution of snowfall values (in mm) greater than 0 and less than 100 separately by year. 
-
-From the hex plot we see that while there is some variability, the majority of the data cluster tightly in the center of the distribution. In relatively rare cases, it seems that `tmax` is less than `tmin`, which raises questions about data recording and quality.
-
-From the ridge plot, we see a multimodal density of snowfall within a given year. Most stations see between 0 and  35 mm of snow in a year. Then there is a another group of stations that see about 45 mm of snow, and another group that sees nearly 80 mm. It is likely this multimodality stems from the conversion of measurements in one system (fractions of an inch) to another (using the metric system), which was also noted in the table of common values. 
+It generates a two-panel plot displaying the average maximum temperature for each station in January and July across years. As expected, the average temperature in January is significantly lower than in July for all stations and over all years. The stations exhibit similar temperature patterns, with synchronized peaks and troughs over time—when one station records a high average temperature for a given year, most other stations show similar behavior. However, there is one notably cold outlier in July around 1987 or 1988, along with a few other smaller deviations from the overall trend.
 
 ```{r}
 hex = 
   ny_noaa |> 
   ggplot(aes(x = tmin, y = tmax)) + 
-  geom_hex()
+  geom_hex() +
+  labs(title = "Hex Plot of tmin vs tmax", x = "Minimum Temperature (°C)", y = "Maximum Temperature (°C)")
 
 ridge = 
   ny_noaa |> 
   filter(snow < 100, snow > 0) |>
   ggplot(aes(x = snow, y = as.factor(year))) + 
-  geom_density_ridges()
+  geom_density_ridges() +
+  labs(title = "Snowfall Distribution by Year", x = "Snowfall (cm)", y = "Year")
 
 hex + ridge
 ```
+
+
+This two-panel plot includes: (i) a hex plot of tmax versus tmin for the full dataset, and (ii) a ridge plot showing the distribution of snowfall values (in cm) greater than 0 and less than 100, broken down by year.
+
+From the hex plot, I observe that while there is some variability in the data, most of the observations are tightly clustered around the center of the distribution. This suggests a strong correlation between minimum and maximum temperatures. Interestingly, there are a few rare cases where tmax is recorded as less than tmin, which points to potential issues with data recording or quality.
+
+The ridge plot shows a multimodal distribution of snowfall within each year. Most stations report snowfall amounts between 0 and 4 cm. This pattern aligns with the earlier observation of common snowfall values in the dataset.
 
 ### Problem 2
 ```{r P2 data cleaning}
@@ -121,7 +133,7 @@ After I `group_by` education and sex,  I used summarise to calculated the number
 
 The table shows a similar number of females and males at both `Less than High School` and `More than High School`, the gender disparity is similar when we think about education both `Less than High School` and `More than High School`. In contrast, more males than females have a `High School Equivalent` education. It is a worth to study question that why such big difference appear only in high school equivalent education
 
-```{r P2 Age distribution, fig.width = 6, fig.asp = .6}
+```{r P2 Age distribution, fig.width = 8, fig.asp = .6}
 nhanes_merged|>
   select(age, sex, education)|>
   ggplot(aes(x = age, fill = sex)) +
@@ -132,7 +144,8 @@ nhanes_merged|>
        y = "Density") + 
   viridis::scale_fill_viridis(discrete = TRUE)
 ```
-II used the nhanes_merged dataset to explore the age distribution by sex and education level by density plots. By selecting the variables that we looking for (age, sex, and education), and plotting age as a density function with color of sex, and put education in different panel for more easy to understand the difference.
+
+I used the nhanes_merged dataset to explore the age distribution by sex and education level by density plots. By selecting the variables that we looking for (age, sex, and education), and plotting age as a density function with color of sex, and put education in different panel for more easy to understand the difference.
 
 Both genders show a peak in young age groups in `More than High School`, which lead to a higher proportion of younger individuals pursuing higher education. But the female also has higher density in young age groups.
 
@@ -141,7 +154,7 @@ For `High School Equivalent` education, the female and male are opposite to each
 The `Less than High School`, gender are similar to each other. age group amount 60 has a low density compare to other age group that close to it.
 
 
-```{r P2 Total activity, fig.width = 6, fig.asp = .6}
+```{r P2 Total activity, fig.width = 8, fig.asp = .6}
 nhanes_merged |>
   rowwise() |>
   mutate(total_activity = sum(c_across(starts_with("min")))) |>
@@ -155,35 +168,26 @@ nhanes_merged |>
   viridis::scale_fill_viridis(discrete = TRUE) +
   theme(legend.position = "bottom")
 ```
+
 In the analysis, I sum all activity start with "min" data, then use ggplot's `geom_point` and `geom_smooth` visualized this total activity against age by both point and lines, while use sex as color and put in different panels by education level. 
 
 Activity peaks in mid-life across all educational backgrounds, suggesting a higher engagement in physical activity among middle-aged adults. Males generally showing slightly higher activity levels in less than high school education while men are older then 40, in other education and age all showes women has higher total activity. The trend lines, shows a  overall decrease in activity as age increases. 
 
 
-```{r P2 Activity time, fig.width = 6, fig.asp = 1}
-three_panel_plot <- nhanes_merged |>
+```{r P2 Activity time, fig.width = 8, fig.asp = 0.6}
+nhanes_merged |>
   pivot_longer(cols = starts_with("min"), names_to = "minute", values_to = "activity") |>
   mutate(minute = as.numeric(str_extract(minute, "\\d+"))) |>
   ggplot(aes(x = minute, y = activity, color = sex)) +
-  geom_point(alpha =  0.5) +
+  geom_line(size = 0.1, alpha =  0.5) +
+  geom_smooth(se = FALSE, size = 1) +
   facet_wrap(~ education) +
-  labs(title = "24-hour Activity Time Courses by Education Level and Sex", y = "Activity", x = "") + 
+  labs(title = "24-hour Activity Time Courses by Education Level and Sex", y = "Activity", x = "Minutes of 24 Hours") + 
   viridis::scale_fill_viridis(discrete = TRUE) +
   theme(legend.position = "none")
-
-three_panel_smooth <- nhanes_merged |>
-  pivot_longer(cols = starts_with("min"), names_to = "minute", values_to = "activity") |>
-  mutate(minute = as.numeric(str_extract(minute, "\\d+"))) |>
-  ggplot(aes(x = minute, y = activity, color = sex)) +
-  geom_smooth(alpha = 0.5) +
-  facet_wrap(~ education) + 
-  labs(title = "Smooth Trend", y = "Activity", x = "Minute of 24-hour") + 
-  viridis::scale_fill_viridis(discrete = TRUE) +
-  theme(legend.position = "bottom")
-
-three_panel_plot / three_panel_smooth
 ```
-I transformed data into a long format to easier analyze 24-hour activity patterns by using pivot_longer. I use minutes as x and activity as y, too bad that the it is really hard to observe the smooth line on the three panal plot due to same color as data point, so I took out the smooth line and parchwork them together for better observation. 
+
+I transformed data into a long format to easier analyze 24-hour activity patterns by using pivot_longer. The plot is faceted by education level, and lines represent activity over time for males and females. x for minute and y for activity in every minuts to show the overall activity for each data.
 
 The 24-hour activity patterns by education level and sex, showing a similarity of activity peaking midday and low at begining of the day which is midnight across all groups. The differences between males and females are small, female has slightly higher activity peaks in all education group. More than High School education, female seems has bigger difference with male in midday than other two education group. Individuals with less than high school education tend to have higher peaks around 700 minuts which is around 11:30 AM. 
 
@@ -217,7 +221,7 @@ July2024Citi <- read_csv("data/citibike/July 2024 Citi.csv",
 Citi_df <- bind_rows(Jan2020Citi, Jan2024Citi, July2020Citi, July2024Citi) |>
   relocate(year, month, weekdays)
 ```
-I read each csv file independently and clean their name and mutate the year and month variable in order for us to know when is the dataset come from. Then use bind rows to combine all four dataset together. The final dataset, Citi_df, contains  ride duration, start and end times, station ID, rideable_type, and user type (member or casual user). I placing the most relevant time variables (year, month) first, for tidyness.This dataset contains `r nrow(Citi_df)` rows and `r ncol(Citi_df)` columns.  Variables include `r colnames(nhanes_merged)`.
+I read each csv file independently and clean their name and mutate the year and month variable in order for us to know when is the dataset come from. Then use bind rows to combine all four dataset together. The final dataset, Citi_df, contains  ride duration, start and end times, station ID, rideable_type, and user type (member or casual user). I placing the most relevant time variables (year, month) first, for tidyness.This dataset contains `r nrow(Citi_df)` rows and `r ncol(Citi_df)` columns.  Variables include `r colnames(Citi_df)`.
 
 ```{r P3 member_casual table}
 Citi_df |>
@@ -245,7 +249,7 @@ Citi_df |>
 ```
 I first filter 2024 july dataset, then group data by start_station_name and summarise how many rides happen in each start station, and by arrange it from more to less, first 5 would be the top 5 popular start station we looking for.
 
-```{r P3 Median Ride Duration, fig.width = 6, fig.asp = .6}
+```{r P3 Median Ride Duration, fig.width = 8, fig.asp = .6}
 Citi_df |>
   group_by(year, month, weekdays) |>
   summarise(median_ride_duration = median(duration)) |>
@@ -256,9 +260,10 @@ Citi_df |>
   labs(title = "Median Ride Duration Across Different Times") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))  
 ```
+
 I group by year month and weekdays in order to get median_ride_duration for each times. then use month as color, weekdays as x and seperate as two panels by year. On the graph, we can clearly see that 2020 has significant larger median ride duration than 2024 overall. For 2020 jan , july and 2024 july, the weekend  has higher median ride duration than work days, but for 2024 jan, it is more stable. Overall, as monday to sunday, the overall trend are increasing. 
 
-```{r P3 Impact on Duration, fig.width = 6, fig.asp = .8}
+```{r P3 Impact on Duration, fig.width = 8, fig.asp = .8}
 Citi_df |>
   filter(year == 2024) |>
   ggplot(aes(x = duration, fill = member_casual)) +
@@ -266,6 +271,7 @@ Citi_df |>
   facet_wrap(month~rideable_type) +
   labs(title = "Impact on Ride Duration in 2024")
 ```
+
 I filtered the 2024 Citi Bike data to focus on ride durations, categorized by membership status (member & casual) and bike type (classic & electric). Using ggplot, I created histograms to visually compare the distributions of ride durations within these categories. The histograms are displayed separately for each bike type through the use of facet_wrap, highlighting differences in usage patterns between classic and electric bikes. Members in general show higher duration than casual overall. For Electric bikes, both member and casual riders of electric bikes tend to have longer ride durations compared to those using classic bikes. July has longer duration than Jane overall. Both distributioon are really skewness. Also the majority of duration is with 50, a lot of people took it as a short trip.
 
 
